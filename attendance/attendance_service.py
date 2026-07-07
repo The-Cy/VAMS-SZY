@@ -1,12 +1,17 @@
+from rapidfuzz import fuzz
 from database.db import SessionLocal
-from database.models import AttendanceSession, AttendanceRecord, Student
+from database.models import (
+    Student,
+    AttendanceRecord,
+    AttendanceSession
+)
 from datetime import datetime
 
 
 # =========================
 # CREATE SESSION
 # =========================
-def create_session(course_id, period):
+def create_session(course_id=1, period="Morning"):
     db = SessionLocal()
 
     session = AttendanceSession(
@@ -18,15 +23,22 @@ def create_session(course_id, period):
     db.add(session)
     db.commit()
     db.refresh(session)
+
+    session_id = session.id
     db.close()
 
-    return session.id
+    return session_id
 
 
 # =========================
-# MARK ATTENDANCE
+# MARK ATTENDANCE (FINAL VERSION)
 # =========================
-def mark_attendance(session_id, index_number):
+def mark_attendance(
+    session_id,
+    index_number,
+    spoken_name=None,
+    status="Present"
+):
     db = SessionLocal()
 
     student = db.query(Student).filter(
@@ -35,33 +47,50 @@ def mark_attendance(session_id, index_number):
 
     if not student:
         db.close()
-        return "Student not found"
+        return "❌ Student not found"
 
-    # ✅ COPY VALUE BEFORE CLOSING SESSION
-    student_name = student.full_name
+    # =========================
+    # FUZZY NAME CHECK
+    # =========================
+    if spoken_name:
+        score = fuzz.partial_ratio(
+            spoken_name.lower(),
+            student.full_name.lower()
+        )
 
+        if score < 60:
+            db.close()
+            return (
+                f"⚠️ Name unclear (confidence {score/100:.2f}). "
+                f"DB says: {student.full_name}"
+            )
+
+    # =========================
+    # DUPLICATE CHECK
+    # =========================
+    existing = db.query(AttendanceRecord).filter(
+        AttendanceRecord.session_id == session_id,
+        AttendanceRecord.student_id == student.id
+    ).first()
+
+    if existing:
+        db.close()
+        return f"⚠️ Already marked: {student.full_name}"
+
+    # =========================
+    # CREATE RECORD
+    # =========================
     record = AttendanceRecord(
         session_id=session_id,
         student_id=student.id,
-        status="Present",
+        status=status,
         timestamp=datetime.utcnow()
     )
 
     db.add(record)
     db.commit()
+
+    name = student.full_name
     db.close()
 
-    return f"{student_name} marked present"
-
-# =========================
-# GET SESSION RECORDS
-# =========================
-def get_session_records(session_id):
-    db = SessionLocal()
-
-    records = db.query(AttendanceRecord).filter(
-        AttendanceRecord.session_id == session_id
-    ).all()
-
-    db.close()
-    return records
+    return f"✅ {name} ({index_number}) marked {status}"
