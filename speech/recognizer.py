@@ -1,205 +1,84 @@
+import json
 import queue
 import sounddevice as sd
+
 from vosk import Model, KaldiRecognizer
-import json
-import re
 
-from attendance.session_manager import (
-    start_new_session,
-    end_session,
-    get_active_session
-)
 
-from attendance.attendance_service import mark_attendance
+# ==============================
+# VOSK MODEL LOCATION
+# ==============================
 
-# =========================
-# MODEL
-# =========================
 MODEL_PATH = "models/vosk-model-small-en-us-0.15"
 
-# =========================
-# NUMBER WORDS
-# =========================
-WORDS_TO_NUM = {
-    "zero": "0",
-    "oh": "0",
-    "one": "1",
-    "two": "2",
-    "three": "3",
-    "four": "4",
-    "five": "5",
-    "six": "6",
-    "seven": "7",
-    "eight": "8",
-    "nine": "9",
-}
 
-# =========================
-# MIC SELECTION
-# =========================
-def get_best_mic():
-    devices = sd.query_devices()
+# ==============================
+# AUDIO SETTINGS
+# ==============================
 
-    for i, d in enumerate(devices):
-        if d["max_input_channels"] > 0:
-            name = d["name"].lower()
-
-            if "microphone" in name or "mic" in name:
-                print(f"🎯 Using mic: {i} -> {d['name']}")
-                return i
-
-    print("⚠️ Defaulting to mic 0")
-    return 0
+SAMPLE_RATE = 16000
 
 
-DEVICE_INDEX = get_best_mic()
+audio_queue = queue.Queue()
 
-q = queue.Queue()
 
-# =========================
-# AUDIO CALLBACK
-# =========================
-def callback(indata, frames, time, status):
+
+# ==============================
+# MICROPHONE CALLBACK
+# ==============================
+
+def callback(
+    indata,
+    frames,
+    time,
+    status
+):
+
     if status:
-        print("Audio status:", status)
-
-    q.put(bytes(indata))
+        print(status)
 
 
-# =========================
-# WORDS → DIGITS
-# =========================
-def words_to_number(text):
-    digits = []
-
-    for word in text.split():
-
-        clean = word.lower()
-
-        if clean in WORDS_TO_NUM:
-            digits.append(WORDS_TO_NUM[clean])
-
-        elif clean.isdigit():
-            digits.append(clean)
-
-    if digits:
-        return "".join(digits)
-
-    return None
+    audio_queue.put(
+        bytes(indata)
+    )
 
 
-# =========================
-# HYBRID PARSER
-# =========================
-def parse_command(text):
 
-    text = text.lower().strip()
+# ==============================
+# START LISTENING
+# ==============================
 
-    # ---------------------
-    # SESSION COMMANDS
-    # ---------------------
-    if "start attendance" in text:
-        return ("start_session", None, None, None)
+def listen():
 
-    if (
-        "end attendance" in text
-        or "finish attendance" in text
-        or "stop attendance" in text
-    ):
-        return ("end_session", None, None, None)
-
-    # ---------------------
-    # ACTION DETECTION
-    # ---------------------
-    action = None
-
-    if any(word in text for word in [
-        "present",
-        "president",
-        "preserved",
-        "prison"
-    ]):
-        action = "Present"
-
-    elif "absent" in text:
-        action = "Absent"
-
-    # ---------------------
-    # ID EXTRACTION
-    # ---------------------
-    index_number = words_to_number(text)
-
-    if not index_number:
-
-        match = re.search(r"\b\d{3,12}\b", text)
-
-        if match:
-            index_number = match.group(0)
-
-    # ---------------------
-    # NAME EXTRACTION
-    # ---------------------
-    words = text.split()
-
-    spoken_name = None
-
-    for w in words:
-
-        if (
-            w not in WORDS_TO_NUM
-            and not w.isdigit()
-            and w not in [
-                "present",
-                "president",
-                "preserved",
-                "prison",
-                "absent",
-                "mark",
-                "attendance"
-            ]
-        ):
-            spoken_name = w
-            break
-
-    # ---------------------
-    # ATTENDANCE COMMAND
-    # ---------------------
-    if index_number and action:
-        return (
-            "attendance",
-            index_number,
-            spoken_name,
-            action
-        )
-
-    return (None, None, None, None)
+    print("🎤 Listening...")
 
 
-# =========================
-# MAIN LISTENER
-# =========================
-def start_listening():
+    model = Model(
+        MODEL_PATH
+    )
 
-    print("\n🎤 Listening (Hybrid Mode)...")
-    print("👉 Say 'start attendance' to begin\n")
 
-    model = Model(MODEL_PATH)
-    recognizer = KaldiRecognizer(model, 16000)
+    recognizer = KaldiRecognizer(
+        model,
+        SAMPLE_RATE
+    )
 
-    session_id = None
+
 
     with sd.RawInputStream(
-        device=DEVICE_INDEX,
-        samplerate=16000,
-        blocksize=4000,
+        samplerate=SAMPLE_RATE,
+        blocksize=8000,
         dtype="int16",
         channels=1,
-        callback=callback,
+        callback=callback
     ):
+
 
         while True:
 
-            data = q.get()
+
+            data = audio_queue.get()
+
 
             if recognizer.AcceptWaveform(data):
 
@@ -207,93 +86,19 @@ def start_listening():
                     recognizer.Result()
                 )
 
-                text = result.get("text", "")
 
-                if not text:
-                    continue
+                text = result.get(
+                    "text",
+                    ""
+                )
 
-                print("🗣️ Heard:", text)
 
-                cmd, index_number, spoken_name, action = parse_command(text)
-
-                # -------------------------
-                # START SESSION
-                # -------------------------
-                if cmd == "start_session":
-
-                    session_id = start_new_session(
-                        course_id=1,
-                        period="Morning"
-                    )
+                if text:
 
                     print(
-                        f"🟢 Session started: {session_id}"
+                        "Heard:",
+                        text
                     )
 
-                    print(
-                        "👉 Start saying: Name ID Status"
-                    )
 
-                    print(
-                        "👉 Example: Kims two three one zero zero zero present"
-                    )
-
-                    continue
-
-                # -------------------------
-                # END SESSION
-                # -------------------------
-                if cmd == "end_session":
-
-                    if session_id:
-
-                        end_session()
-
-                        print(
-                            f"🔴 Session ended: {session_id}"
-                        )
-
-                        session_id = None
-
-                    else:
-                        print("⚠️ No active session")
-
-                    continue
-
-                # -------------------------
-                # ATTENDANCE
-                # -------------------------
-                if cmd == "attendance":
-
-                    if not session_id:
-
-                        print(
-                            "⚠️ No active session. Say 'start attendance'"
-                        )
-
-                        continue
-
-                    result = mark_attendance(
-                        session_id=session_id,
-                        index_number=index_number,
-                        spoken_name=spoken_name,
-                        status=action
-                    )
-
-                    print("🗄️ DB:", result)
-
-                    continue
-
-                # -------------------------
-                # EXIT
-                # -------------------------
-                if "exit" in text:
-
-                    print("🛑 Stopping...")
-                    break
-
-                print("⚪ Ignored noise")
-
-
-if __name__ == "__main__":
-    start_listening()
+                    return text

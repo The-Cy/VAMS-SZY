@@ -1,96 +1,448 @@
 from rapidfuzz import fuzz
+
 from database.db import SessionLocal
+
 from database.models import (
     Student,
     AttendanceRecord,
-    AttendanceSession
+    AttendanceSession,
+    StudentCourse
 )
+
 from datetime import datetime
 
 
-# =========================
-# CREATE SESSION
-# =========================
-def create_session(course_id=1, period="Morning"):
+
+# =====================================================
+# CREATE ATTENDANCE SESSION
+# =====================================================
+# Creates:
+#
+# Course Unit
+# Lecturer
+# QA User
+# Date
+# Period
+#
+# Example:
+# Database Systems
+# Mr Jeff
+# QA1
+# Morning
+# 21/07/2026
+# =====================================================
+
+
+def create_session(
+    course_id,
+    lecturer_id,
+    user_id,
+    period,
+    session_date
+):
+
     db = SessionLocal()
 
+
     session = AttendanceSession(
+
         course_id=course_id,
+
+        lecturer_id=lecturer_id,
+
+        started_by=user_id,
+
         period=period,
-        session_date=datetime.utcnow()
+
+        session_date=session_date,
+
+        closed=False
+
     )
 
+
     db.add(session)
+
     db.commit()
+
     db.refresh(session)
 
+
     session_id = session.id
+
+
     db.close()
+
 
     return session_id
 
 
-# =========================
-# MARK ATTENDANCE (FINAL VERSION)
-# =========================
+
+
+
+# =====================================================
+# MARK ATTENDANCE
+# =====================================================
+#
+# Voice example:
+#
+# "Kims 2300100666 present"
+#
+# Main identifier:
+# student_number
+#
+# Name:
+# optional verification
+#
+# =====================================================
+
+
 def mark_attendance(
     session_id,
-    index_number,
+    student_number,
     spoken_name=None,
     status="Present"
 ):
+
     db = SessionLocal()
 
-    student = db.query(Student).filter(
-        Student.index_number == index_number
+
+
+    # -----------------------------------------
+    # Check session exists
+    # -----------------------------------------
+
+    session = db.query(
+        AttendanceSession
+    ).filter(
+
+        AttendanceSession.id == session_id
+
     ).first()
 
-    if not student:
-        db.close()
-        return "❌ Student not found"
 
-    # =========================
-    # FUZZY NAME CHECK
-    # =========================
+
+    if not session:
+
+
+        db.close()
+
+        return "❌ Attendance session not found"
+
+
+
+
+
+    # -----------------------------------------
+    # Find student registered for this course
+    # -----------------------------------------
+
+    student = (
+
+        db.query(Student)
+
+        .join(
+
+            StudentCourse,
+
+            Student.id == StudentCourse.student_id
+
+        )
+
+        .filter(
+
+            Student.student_number == student_number,
+
+            StudentCourse.course_id == session.course_id
+
+        )
+
+        .first()
+
+    )
+
+
+
+    if not student:
+
+
+        db.close()
+
+
+        return (
+            "❌ Student not found "
+            "or not registered for this course"
+        )
+
+
+
+
+
+    # -----------------------------------------
+    # Optional name verification
+    # -----------------------------------------
+
+    # ---------------------------------
+# Optional name verification
+# Student number remains primary key
+# ---------------------------------
+
     if spoken_name:
+
         score = fuzz.partial_ratio(
             spoken_name.lower(),
             student.full_name.lower()
         )
 
-        if score < 60:
-            db.close()
-            return (
-                f"⚠️ Name unclear (confidence {score/100:.2f}). "
-                f"DB says: {student.full_name}"
+        if score < 40:
+
+            print(
+                f"⚠️ Name mismatch ignored. "
+                f"Using student number."
             )
 
-    # =========================
-    # DUPLICATE CHECK
-    # =========================
-    existing = db.query(AttendanceRecord).filter(
+
+
+
+
+
+
+    # -----------------------------------------
+    # Prevent duplicate attendance
+    # -----------------------------------------
+
+    existing = db.query(
+        AttendanceRecord
+    ).filter(
+
         AttendanceRecord.session_id == session_id,
+
         AttendanceRecord.student_id == student.id
+
     ).first()
 
-    if existing:
-        db.close()
-        return f"⚠️ Already marked: {student.full_name}"
 
-    # =========================
-    # CREATE RECORD
-    # =========================
+
+    if existing:
+
+
+        db.close()
+
+
+        return (
+            f"⚠️ Already marked: "
+            f"{student.full_name}"
+        )
+
+
+
+
+
+
+
+    # -----------------------------------------
+    # Create attendance record
+    # -----------------------------------------
+
     record = AttendanceRecord(
+
         session_id=session_id,
+
         student_id=student.id,
+
         status=status,
+
         timestamp=datetime.utcnow()
+
     )
 
+
     db.add(record)
+
     db.commit()
 
+
+
     name = student.full_name
+
+
+
     db.close()
 
-    return f"✅ {name} ({index_number}) marked {status}"
+
+
+    return (
+
+        f"✅ {name} "
+
+        f"({student_number}) "
+
+        f"marked {status}"
+
+    )
+
+
+
+
+
+
+
+# =====================================================
+# AUTO MARK REMAINING STUDENTS ABSENT
+# =====================================================
+#
+# Called when QA says:
+#
+# "finish attendance"
+#
+# Any student not recorded becomes absent.
+#
+# =====================================================
+
+
+def mark_remaining_absent(session_id):
+
+
+    db = SessionLocal()
+
+
+
+    # -----------------------------------------
+    # Get session
+    # -----------------------------------------
+
+    session = db.query(
+        AttendanceSession
+    ).filter(
+
+        AttendanceSession.id == session_id
+
+    ).first()
+
+
+
+    if not session:
+
+
+        db.close()
+
+
+        return "❌ Session not found"
+
+
+
+
+
+
+
+    # -----------------------------------------
+    # Get all students registered
+    # for selected course
+    # -----------------------------------------
+
+    students = (
+
+        db.query(Student)
+
+        .join(
+
+            StudentCourse,
+
+            Student.id == StudentCourse.student_id
+
+        )
+
+        .filter(
+
+            StudentCourse.course_id == session.course_id
+
+        )
+
+        .all()
+
+    )
+
+
+
+
+
+
+
+    added = 0
+
+
+
+
+
+    # -----------------------------------------
+    # Add absent records
+    # for students not mentioned
+    # -----------------------------------------
+
+    for student in students:
+
+
+
+        existing = db.query(
+            AttendanceRecord
+        ).filter(
+
+            AttendanceRecord.session_id == session_id,
+
+            AttendanceRecord.student_id == student.id
+
+        ).first()
+
+
+
+        if not existing:
+
+
+
+            record = AttendanceRecord(
+
+                session_id=session_id,
+
+                student_id=student.id,
+
+                status="Absent",
+
+                timestamp=datetime.utcnow()
+
+            )
+
+
+            db.add(record)
+
+
+            added += 1
+
+
+
+
+
+
+
+    # -----------------------------------------
+    # Close session
+    # -----------------------------------------
+
+    session.closed = True
+
+
+
+    db.commit()
+
+
+
+    db.close()
+
+
+
+    return (
+
+        f"✅ Attendance completed. "
+
+        f"{added} students marked absent."
+
+    )
