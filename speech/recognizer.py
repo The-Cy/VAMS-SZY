@@ -1,104 +1,104 @@
+import json
 import queue
 import sounddevice as sd
-from vosk import Model, KaldiRecognizer
-import json
-import re
 
-# ✅ MODEL PATH
+from vosk import Model, KaldiRecognizer
+
+
+# ==============================
+# VOSK MODEL LOCATION
+# ==============================
+
 MODEL_PATH = "models/vosk-model-small-en-us-0.15"
 
+
 # ==============================
-# 🔍 AUTO MIC SELECT (BEST INPUT)
+# AUDIO SETTINGS
 # ==============================
-def get_best_mic():
-    devices = sd.query_devices()
-    for i, d in enumerate(devices):
-        if d["max_input_channels"] > 0:
-            name = d["name"].lower()
-            if "microphone" in name or "mic" in name:
-                print(f"🎯 Using mic: {i} -> {d['name']}")
-                return i
-    print("⚠️ Defaulting to mic 0")
-    return 0
+
+SAMPLE_RATE = 16000
 
 
-DEVICE_INDEX = get_best_mic()
+audio_queue = queue.Queue()
 
-q = queue.Queue()
 
 
 # ==============================
-# 🎙 AUDIO CALLBACK
+# MICROPHONE CALLBACK
 # ==============================
-def callback(indata, frames, time, status):
+
+def callback(
+    indata,
+    frames,
+    time,
+    status
+):
+
     if status:
-        print("Audio status:", status)
-    q.put(bytes(indata))
+        print(status)
 
 
-# ==============================
-# 🧠 PARSE COMMAND
-# ==============================
-def parse_command(text):
-    text = text.lower().strip()
+    audio_queue.put(
+        bytes(indata)
+    )
 
-    # extract number (student ID)
-    match = re.search(r"\b\d{3,10}\b", text)
-    student_id = match.group(0) if match else None
-
-    # detect action
-    if "present" in text:
-        action = "present"
-    elif "absent" in text:
-        action = "absent"
-    else:
-        action = None
-
-    return student_id, action
 
 
 # ==============================
-# 🚀 MAIN LISTENER
+# START LISTENING
 # ==============================
-def start_listening():
-    print("\n🎤 Listening (optimized mode)...\n")
 
-    model = Model(MODEL_PATH)
-    recognizer = KaldiRecognizer(model, 16000)
+def listen():
+
+    print("🎤 Listening...")
+
+
+    model = Model(
+        MODEL_PATH
+    )
+
+
+    recognizer = KaldiRecognizer(
+        model,
+        SAMPLE_RATE
+    )
+
+
 
     with sd.RawInputStream(
-        device=DEVICE_INDEX,
-        samplerate=16000,
-        blocksize=4000,   # 🔥 reduced lag
+        samplerate=SAMPLE_RATE,
+        blocksize=8000,
         dtype="int16",
         channels=1,
-        callback=callback,
+        callback=callback
     ):
+
+
         while True:
-            data = q.get()
+
+
+            data = audio_queue.get()
+
 
             if recognizer.AcceptWaveform(data):
-                result = json.loads(recognizer.Result())
-                text = result.get("text", "")
+
+                result = json.loads(
+                    recognizer.Result()
+                )
+
+
+                text = result.get(
+                    "text",
+                    ""
+                )
+
 
                 if text:
-                    print("🗣️ Heard:", text)
 
-                    student_id, action = parse_command(text)
-
-                    if student_id and action:
-                        print(f"✅ Parsed → ID: {student_id}, Action: {action}")
-
-                        # 👉 CALL YOUR DB FUNCTION HERE
-                        # mark_attendance(student_id, action)
-
-                    else:
-                        print("⚠️ Could not parse command properly")
-
-                    if "exit" in text:
-                        print("🛑 Stopping...")
-                        break
+                    print(
+                        "Heard:",
+                        text
+                    )
 
 
-if __name__ == "__main__":
-    start_listening()
+                    return text
