@@ -1,16 +1,15 @@
-from gui.attendance_window import AttendanceWindow
-
-
 window = None
 
 
-def start_gui(app):
+
+def set_window(
+    gui_window
+):
 
     global window
 
-    window = AttendanceWindow()
+    window = gui_window
 
-    window.show()
 
 
 
