@@ -1,66 +1,133 @@
 import sys
 
+
 from PyQt5.QtWidgets import QApplication
 
+
 from gui.attendance_window import AttendanceWindow
+
+
+from gui.gui_manager import set_window
+
 
 from speech.voice_thread import VoiceThread
 
 
-
-app = QApplication(sys.argv)
-
-
-
-window = AttendanceWindow()
-
-window.show()
+from attendance.voice_controller import process_voice_command
 
 
 
-voice = VoiceThread()
 
 
+def start_application():
 
-def handle_command(command):
 
-
-    print(
-        "Command:",
-        command
+    app = QApplication(
+        sys.argv
     )
 
 
-    if command["action"] == "attendance":
+
+    # ==========================
+    # CREATE WINDOW
+    # ==========================
+
+    window = AttendanceWindow()
+
+    window.show()
 
 
-        window.mark_present(
 
-            command["student_number"],
+    # REGISTER GUI GLOBALLY
 
-            "NOW"
+    set_window(
+        window
+    )
 
+
+
+
+    # ==========================
+    # VOICE THREAD
+    # ==========================
+
+    voice_thread = VoiceThread()
+
+
+
+    def handle_command(command):
+
+
+        print(
+            "Command:",
+            command
         )
 
 
-
-    elif command["action"] == "finish":
-
-
-        window.mark_absent_remaining()
+        try:
 
 
-
-voice.command_received.connect(
-    handle_command
-)
-
+            result = process_voice_command(
+                command
+            )
 
 
-voice.start()
+            print(
+                result
+            )
+
+
+        except Exception as e:
+
+
+            print(
+                "GUI ERROR:",
+                e
+            )
 
 
 
-sys.exit(
-    app.exec_()
-)
+
+    voice_thread.command_received.connect(
+        handle_command
+    )
+
+
+
+    voice_thread.start()
+
+
+
+
+    def close_application():
+
+
+        voice_thread.stop()
+
+        voice_thread.wait()
+
+
+
+    app.aboutToQuit.connect(
+        close_application
+    )
+
+
+
+    sys.exit(
+        app.exec_()
+    )
+
+
+
+
+
+if __name__ == "__main__":
+
+
+    print(
+        "🎤 Voice Attendance System Started"
+    )
+
+
+    start_application()

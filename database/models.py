@@ -196,6 +196,9 @@ class StudentCourse(Base):
 # Database Systems
 # ======================================
 class AttendanceSession(Base):
+    session_name = Column(
+    String
+)
 
     __tablename__ = "attendance_sessions"
 

@@ -10,8 +10,14 @@ from database.models import AttendanceSession
 from datetime import datetime
 
 
-# Stores currently running session
+
+# =====================================
+# ACTIVE SESSION STORAGE
+# =====================================
+
 active_session_id = None
+
+
 
 
 
@@ -23,22 +29,40 @@ def start_new_session(
     course_id,
     lecturer_id,
     user_id,
-    period
+    period,
+    session_date=None
 ):
 
     global active_session_id
 
 
+
+    # Use current date if none selected
+
+    if session_date is None:
+
+        session_date = datetime.now()
+
+
+
     session_id = create_session(
+
         course_id=course_id,
+
         lecturer_id=lecturer_id,
+
         user_id=user_id,
+
         period=period,
-        session_date=datetime.now()
+
+        session_date=session_date
+
     )
 
 
+
     active_session_id = session_id
+
 
 
     return session_id
@@ -47,8 +71,9 @@ def start_new_session(
 
 
 
+
 # =====================================
-# GET CURRENT SESSION
+# GET ACTIVE SESSION
 # =====================================
 
 def get_active_session():
@@ -59,48 +84,72 @@ def get_active_session():
 
 
 
+
 # =====================================
 # END SESSION
 # =====================================
 
-def end_session(session_id):
+def end_session(session_id=None):
+
     global active_session_id
+
 
 
     if active_session_id is None:
 
-        return "⚠️ No active attendance session"
+
+        return (
+            "⚠️ No active attendance session"
+        )
 
 
 
-    session_id = active_session_id
+    # Always close the running session
+
+    current_session_id = active_session_id
 
 
 
-    # Mark students who never responded absent
+
+
+    # Mark students not checked in as absent
 
     result = mark_remaining_absent(
-        session_id
+
+        current_session_id
+
     )
+
+
 
 
 
     db = SessionLocal()
 
 
+
     session = db.query(
+
         AttendanceSession
+
     ).filter(
-        AttendanceSession.id == session_id
+
+        AttendanceSession.id == current_session_id
+
     ).first()
+
+
 
 
 
     if session:
 
+
         session.closed = True
 
         db.commit()
+
+
 
 
 
@@ -112,8 +161,14 @@ def end_session(session_id):
 
 
 
+
+
     return (
+
         result
+
         +
-        f"\n🔴 Session {session_id} closed"
+
+        f"\n🔴 Session {current_session_id} closed"
+
     )

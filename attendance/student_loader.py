@@ -7,26 +7,25 @@ from database.models import (
 
 
 
+# =====================================
+# GET STUDENTS REGISTERED FOR COURSE
+# =====================================
+
 def get_course_students(course_id):
 
     db = SessionLocal()
 
 
     students = (
-
         db.query(Student)
-
         .join(
             StudentCourse,
             Student.id == StudentCourse.student_id
         )
-
         .filter(
             StudentCourse.course_id == course_id
         )
-
         .all()
-
     )
 
 
@@ -36,10 +35,16 @@ def get_course_students(course_id):
     for student in students:
 
         result.append(
+
             {
+                "id": student.id,
+
                 "name": student.full_name,
-                "student_number": student.student_number
+
+                "student_number":
+                    student.student_number
             }
+
         )
 
 

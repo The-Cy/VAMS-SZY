@@ -310,3 +310,15 @@ class AttendanceWindow(QWidget):
                         "-"
                     )
                 )
+    # ===============================
+    # SESSION CLOSED
+    # ===============================
+
+def update_session_status(
+        self,
+        text
+    ):
+
+        self.session_label.setText(
+            text
+        )
