@@ -19,6 +19,9 @@ class AttendanceWindow(QWidget):
         super().__init__()
 
 
+        self.session_name = ""
+
+
         self.setWindowTitle(
             "Voice Attendance Management System"
         )
@@ -34,8 +37,6 @@ class AttendanceWindow(QWidget):
 
 
 
-        # TITLE
-
         self.title = QLabel(
             "🎤 Voice Attendance System"
         )
@@ -50,8 +51,6 @@ class AttendanceWindow(QWidget):
 
 
 
-        # SESSION
-
         self.session_label = QLabel(
             "Session: Waiting"
         )
@@ -62,8 +61,6 @@ class AttendanceWindow(QWidget):
 
 
 
-        # SUMMARY
-
         self.summary_label = QLabel(
             "Present: 0 | Absent: 0"
         )
@@ -73,8 +70,6 @@ class AttendanceWindow(QWidget):
         )
 
 
-
-        # TABLE
 
         self.table = QTableWidget()
 
@@ -101,12 +96,9 @@ class AttendanceWindow(QWidget):
 
 
 
-        # CLOSE
-
         self.close_button = QPushButton(
             "Close Window"
         )
-
 
         self.close_button.clicked.connect(
             self.close
@@ -124,24 +116,38 @@ class AttendanceWindow(QWidget):
 
 
 
-    # ===============================
-    # SESSION
-    # ===============================
+    # =================================
+    # SESSION DISPLAY
+    # =================================
 
     def update_session(
         self,
-        session_id
+        session_id,
+        session_name=None
     ):
 
-        self.session_label.setText(
-            f"🟢 Active Session: {session_id}"
-        )
+
+        if session_name:
+
+            self.session_name = session_name
+
+
+            self.session_label.setText(
+                f"🟢 {session_name}"
+            )
+
+        else:
+
+            self.session_label.setText(
+                f"🟢 Active Session {session_id}"
+            )
 
 
 
-    # ===============================
-    # LOAD CLASS LIST
-    # ===============================
+    # =================================
+    # LOAD STUDENTS
+    # =================================
+
 
     def load_students(
         self,
@@ -167,6 +173,10 @@ class AttendanceWindow(QWidget):
 
             checkbox = QTableWidgetItem()
 
+            # The checkbox is a voice-controlled status indicator, not an
+            # editable attendance input.
+            checkbox.setFlags(Qt.ItemIsEnabled)
+
             checkbox.setCheckState(
                 Qt.Unchecked
             )
@@ -182,43 +192,36 @@ class AttendanceWindow(QWidget):
             self.table.setItem(
                 row,
                 1,
-                QTableWidgetItem(
-                    student["name"]
-                )
+                self._read_only_item(student["name"])
             )
 
 
             self.table.setItem(
                 row,
                 2,
-                QTableWidgetItem(
-                    student["student_number"]
-                )
+                self._read_only_item(student["student_number"])
             )
 
 
             self.table.setItem(
                 row,
                 3,
-                QTableWidgetItem(
-                    "Waiting"
-                )
+                self._read_only_item("Waiting")
             )
 
 
             self.table.setItem(
                 row,
                 4,
-                QTableWidgetItem(
-                    "-"
-                )
+                self._read_only_item("-")
             )
 
 
 
-    # ===============================
-    # MARK PRESENT
-    # ===============================
+    # =================================
+    # VOICE PRESENT UPDATE
+    # =================================
+
 
     def mark_present(
         self,
@@ -253,18 +256,14 @@ class AttendanceWindow(QWidget):
                 self.table.setItem(
                     row,
                     3,
-                    QTableWidgetItem(
-                        "Present"
-                    )
+                    self._read_only_item("Present")
                 )
 
 
                 self.table.setItem(
                     row,
                     4,
-                    QTableWidgetItem(
-                        timestamp
-                    )
+                    self._read_only_item(timestamp)
                 )
 
 
@@ -272,9 +271,14 @@ class AttendanceWindow(QWidget):
 
 
 
-    # ===============================
-    # MARK ABSENT AFTER FINISH
-    # ===============================
+        self.update_summary()
+
+
+
+    # =================================
+    # ABSENT ON CLOSE
+    # =================================
+
 
     def mark_absent_remaining(self):
 
@@ -294,27 +298,86 @@ class AttendanceWindow(QWidget):
             if checked != Qt.Checked:
 
 
+                self.table.item(
+                    row,
+                    0
+                ).setCheckState(
+                    Qt.Unchecked
+                )
+
+
                 self.table.setItem(
                     row,
                     3,
-                    QTableWidgetItem(
-                        "Absent"
-                    )
+                    self._read_only_item("Absent")
                 )
-
 
                 self.table.setItem(
                     row,
                     4,
-                    QTableWidgetItem(
-                        "-"
-                    )
+                    self._read_only_item("-")
                 )
-    # ===============================
-    # SESSION CLOSED
-    # ===============================
 
-def update_session_status(
+
+        self.update_summary()
+
+
+
+    # =================================
+    # SUMMARY
+    # =================================
+
+
+    def update_summary(self):
+
+
+        present = 0
+        absent = 0
+
+
+        for row in range(
+            self.table.rowCount()
+        ):
+
+
+            status = self.table.item(
+                row,
+                3
+            ).text()
+
+
+
+            if status == "Present":
+
+                present += 1
+
+
+            elif status == "Absent":
+
+                absent += 1
+
+
+
+        self.summary_label.setText(
+            f"Present: {present} | Absent: {absent}"
+        )
+
+
+    @staticmethod
+    def _read_only_item(text):
+
+        item = QTableWidgetItem(text)
+        item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+        return item
+
+
+
+    # =================================
+    # SESSION CLOSED
+    # =================================
+
+
+    def update_session_status(
         self,
         text
     ):

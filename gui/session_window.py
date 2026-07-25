@@ -20,18 +20,27 @@ from attendance.session_manager import (
     start_new_session
 )
 
+from attendance.student_loader import (
+    get_course_students
+)
+
 from gui.gui_manager import (
     get_window
 )
 
 
 
+
+
 class SessionWindow(QWidget):
 
 
-    def __init__(self):
+    def __init__(self, user_id=1, on_session_started=None):
 
         super().__init__()
+
+        self.user_id = user_id
+        self.on_session_started = on_session_started
 
 
         self.setWindowTitle(
@@ -49,25 +58,15 @@ class SessionWindow(QWidget):
 
 
 
-        # =================================
-        # TITLE
-        # =================================
-
-        title = QLabel(
-            "📅 Create Attendance Session"
-        )
-
-
         layout.addWidget(
-            title
+            QLabel(
+                "📅 Create Attendance Session"
+            )
         )
 
 
 
-
-        # =================================
-        # COURSE UNIT
-        # =================================
+        # COURSE
 
         layout.addWidget(
             QLabel(
@@ -85,7 +84,6 @@ class SessionWindow(QWidget):
 
         for course in self.courses:
 
-
             self.course_box.addItem(
 
                 f"{course['code']} - {course['name']}",
@@ -102,11 +100,7 @@ class SessionWindow(QWidget):
 
 
 
-
-
-        # =================================
         # LECTURER
-        # =================================
 
         layout.addWidget(
             QLabel(
@@ -116,6 +110,7 @@ class SessionWindow(QWidget):
 
 
         self.lecturer_box = QComboBox()
+
 
 
         self.lecturers = get_lecturers()
@@ -141,15 +136,12 @@ class SessionWindow(QWidget):
 
 
 
-
-
-        # =================================
         # DATE
-        # =================================
+
 
         layout.addWidget(
             QLabel(
-                "Session Date"
+                "Date"
             )
         )
 
@@ -158,9 +150,7 @@ class SessionWindow(QWidget):
 
 
         self.date_box.setDate(
-
             QDate.currentDate()
-
         )
 
 
@@ -176,11 +166,8 @@ class SessionWindow(QWidget):
 
 
 
-
-
-        # =================================
         # PERIOD
-        # =================================
+
 
         layout.addWidget(
             QLabel(
@@ -210,29 +197,21 @@ class SessionWindow(QWidget):
 
 
 
+        # BUTTON
 
 
-
-        # =================================
-        # START BUTTON
-        # =================================
-
-        self.start_button = QPushButton(
-
+        button = QPushButton(
             "Start Attendance"
-
         )
 
 
-        self.start_button.clicked.connect(
-
+        button.clicked.connect(
             self.create_session
-
         )
 
 
         layout.addWidget(
-            self.start_button
+            button
         )
 
 
@@ -245,75 +224,95 @@ class SessionWindow(QWidget):
 
 
 
-
-    # =====================================
-    # CREATE SESSION
-    # =====================================
-
     def create_session(self):
 
 
-        # REAL DATABASE IDS
+        if not self.courses or not self.lecturers:
+            QMessageBox.warning(
+                self,
+                "Missing setup data",
+                "No courses or lecturers are available. Run the database seed first."
+            )
+            return
+
 
         course_id = self.course_box.currentData()
-
 
         lecturer_id = self.lecturer_box.currentData()
 
 
 
-        if not course_id or not lecturer_id:
-
-
-            QMessageBox.warning(
-
-                self,
-
-                "Missing Data",
-
-                "Please select course and lecturer"
-
-            )
-
-            return
+        course = self.courses[
+            self.course_box.currentIndex()
+        ]
 
 
 
-
-
-        user_id = 1
-
+        date = self.date_box.date().toPyDate()
 
 
 
-        session_date = (
+        period = self.period_box.currentText()
 
-            self.date_box.date()
 
-            .toPyDate()
+
+        session_name = (
+
+            f"{course['name']} - "
+
+            f"{period} Session - "
+
+            f"{date}"
 
         )
-
-
-
 
 
 
         session_id = start_new_session(
 
-            course_id=course_id,
+    course_id=course_id,
 
-            lecturer_id=lecturer_id,
+    lecturer_id=lecturer_id,
 
-            user_id=user_id,
+    user_id=self.user_id,
 
-            period=self.period_box.currentText(),
+    period=period,
 
-            session_date=session_date
+    session_date=date,
 
-        )
+    session_name=session_name
+
+)
+
+        attendance = get_window()
 
 
+
+        if attendance:
+
+
+            attendance.update_session(
+                session_id,
+                session_name
+            )
+
+
+            students = get_course_students(
+                course_id
+            )
+
+
+            attendance.load_students(
+                students
+            )
+
+
+            attendance.show()
+
+
+        if self.on_session_started:
+
+            self.on_session_started(session_id)
 
 
 
@@ -321,33 +320,11 @@ class SessionWindow(QWidget):
 
             self,
 
-            "Session Created",
+            "Started",
 
-            f"Attendance Session {session_id} Started"
+            session_name
 
         )
-
-
-
-
-
-        attendance_window = get_window()
-
-
-
-        if attendance_window:
-
-
-            attendance_window.update_session(
-
-                session_id
-
-            )
-
-
-            # next stage:
-            # attendance_window.load_students(course_id)
-
 
 
         self.close()

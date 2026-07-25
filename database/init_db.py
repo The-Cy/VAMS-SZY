@@ -4,10 +4,8 @@ from database import models
 
 print("Creating database tables...")
 
-
 Base.metadata.create_all(
     bind=engine
 )
 
-
-print("✅ Database created successfully!")
+print("Database created successfully")

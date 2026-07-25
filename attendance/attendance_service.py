@@ -32,8 +32,13 @@ from datetime import datetime
 # 21/07/2026
 # =====================================================
 
+from database.db import SessionLocal
+from database.models import AttendanceSession
+
+
 
 def create_session(
+    session_name,
     course_id,
     lecturer_id,
     user_id,
@@ -41,10 +46,13 @@ def create_session(
     session_date
 ):
 
+
     db = SessionLocal()
 
 
     session = AttendanceSession(
+
+        session_name=session_name,
 
         course_id=course_id,
 
@@ -54,9 +62,7 @@ def create_session(
 
         period=period,
 
-        session_date=session_date,
-
-        closed=False
+        session_date=session_date
 
     )
 
@@ -68,17 +74,10 @@ def create_session(
     db.refresh(session)
 
 
-    session_id = session.id
-
-
     db.close()
 
 
-    return session_id
-
-
-
-
+    return session.id
 
 # =====================================================
 # MARK ATTENDANCE
