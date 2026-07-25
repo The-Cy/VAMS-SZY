@@ -195,12 +195,14 @@ class StudentCourse(Base):
 # Morning
 # Database Systems
 # ======================================
+# ======================================
+# DAILY ATTENDANCE SESSION
+# ======================================
+
 class AttendanceSession(Base):
-    session_name = Column(
-    String
-)
 
     __tablename__ = "attendance_sessions"
+
 
     id = Column(
         Integer,
@@ -208,39 +210,52 @@ class AttendanceSession(Base):
         index=True
     )
 
+
+    session_name = Column(
+        String,
+        nullable=False
+    )
+
+
     course_id = Column(
         Integer,
         ForeignKey("courses.id")
     )
+
 
     lecturer_id = Column(
         Integer,
         ForeignKey("lecturers.id")
     )
 
+
     started_by = Column(
         Integer,
         ForeignKey("users.id")
     )
+
 
     session_date = Column(
         DateTime,
         default=datetime.utcnow
     )
 
-    period = Column(String)
+
+    period = Column(
+        String
+    )
+
 
     closed = Column(
         Boolean,
         default=False
     )
 
+
     records = relationship(
         "AttendanceRecord",
         back_populates="session"
     )
-
-
 # ======================================
 # INDIVIDUAL ATTENDANCE
 # ======================================

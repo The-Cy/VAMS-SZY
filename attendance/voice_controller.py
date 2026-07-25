@@ -1,11 +1,6 @@
 from datetime import datetime
 
 
-from attendance.student_loader import (
-    get_course_students
-)
-
-
 from attendance.attendance_service import (
     mark_attendance
 )
@@ -13,7 +8,6 @@ from attendance.attendance_service import (
 
 from attendance.session_manager import (
     get_active_session,
-    start_new_session,
     end_session
 )
 
@@ -21,6 +15,8 @@ from attendance.session_manager import (
 from gui.gui_manager import (
     get_window
 )
+
+
 
 
 
@@ -38,110 +34,10 @@ def process_voice_command(command):
 
 
     # =====================================
-    # START ATTENDANCE
-    # =====================================
-
-    if action == "start":
-
-
-        # TEMPORARY
-        # later this comes from SessionWindow
-
-        course_id = 1
-
-
-
-        session_id = start_new_session(
-
-            course_id=course_id,
-
-            lecturer_id=1,
-
-            user_id=1,
-
-            period="Morning"
-
-        )
-
-
-
-        print(
-            "SESSION CREATED:",
-            session_id
-        )
-
-
-
-        window = get_window()
-
-
-
-        if window:
-
-
-            print(
-                "GUI FOUND"
-            )
-
-
-
-            window.update_session(
-
-                session_id
-
-            )
-
-
-
-            students = get_course_students(
-
-                course_id
-
-            )
-
-
-
-            print(
-                "STUDENTS:",
-                students
-            )
-
-
-
-            window.load_students(
-
-                students
-
-            )
-
-
-
-        else:
-
-
-            print(
-                "GUI WINDOW NOT FOUND"
-            )
-
-
-
-        return (
-
-            f"🟢 Attendance started "
-            f"Session {session_id}"
-
-        )
-
-
-
-
-
-    # =====================================
-    # MARK PRESENT
+    # MARK ATTENDANCE
     # =====================================
 
     if action == "attendance":
-
 
 
         session_id = get_active_session()
@@ -152,18 +48,14 @@ def process_voice_command(command):
 
 
             return (
-
                 "❌ No active attendance session"
-
             )
 
 
 
 
         student_number = command.get(
-
             "student_number"
-
         )
 
 
@@ -172,20 +64,15 @@ def process_voice_command(command):
 
 
             return (
-
                 "❌ Student number missing"
-
             )
 
 
 
 
         status = command.get(
-
             "status",
-
             "Present"
-
         )
 
 
@@ -193,27 +80,24 @@ def process_voice_command(command):
 
         result = mark_attendance(
 
-
             session_id=session_id,
-
 
             student_number=student_number,
 
-
             spoken_name=command.get(
-
                 "name"
-
             ),
 
-
             status=status
-
 
         )
 
 
 
+
+        # ==============================
+        # UPDATE GUI LIVE
+        # ==============================
 
         window = get_window()
 
@@ -243,8 +127,9 @@ def process_voice_command(command):
 
 
 
+
     # =====================================
-    # FINISH SESSION
+    # CLOSE SESSION
     # =====================================
 
     if action == "finish":
@@ -266,11 +151,13 @@ def process_voice_command(command):
 
 
 
+
         result = end_session(
 
             session_id
 
         )
+
 
 
 
@@ -305,8 +192,9 @@ def process_voice_command(command):
 
 
 
+
     # =====================================
-    # UNKNOWN
+    # UNKNOWN COMMAND
     # =====================================
 
     return (

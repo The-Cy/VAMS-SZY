@@ -1,19 +1,11 @@
-import sys
+"""Launch the complete session + dashboard + voice-recognition flow.
 
-from PyQt5.QtWidgets import QApplication
+This used to open only ``SessionWindow``.  That was useful for a visual test,
+but it had no attendance dashboard registered and no VoiceThread running.
+"""
 
-from gui.session_window import SessionWindow
-
-
-
-app = QApplication(sys.argv)
+from speech.run_voice import start_application
 
 
-window = SessionWindow()
-
-window.show()
-
-
-sys.exit(
-    app.exec_()
-)
+if __name__ == "__main__":
+    start_application()

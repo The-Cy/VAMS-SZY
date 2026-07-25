@@ -1,14 +1,10 @@
 from database.db import SessionLocal
-
-from database.models import (
-    Course,
-    Lecturer
-)
+from database.models import Course, Lecturer
 
 
 
 # =====================================
-# LOAD COURSES
+# GET COURSES
 # =====================================
 
 def get_courses():
@@ -21,18 +17,18 @@ def get_courses():
     ).all()
 
 
-    data = []
+    result = []
 
 
     for course in courses:
 
-        data.append({
+        result.append({
 
             "id": course.id,
 
-            "name": course.course_name,
+            "code": course.course_code,
 
-            "code": course.course_code
+            "name": course.course_name
 
         })
 
@@ -40,14 +36,14 @@ def get_courses():
     db.close()
 
 
-    return data
+    return result
 
 
 
 
 
 # =====================================
-# LOAD LECTURERS
+# GET LECTURERS
 # =====================================
 
 def get_lecturers():
@@ -60,12 +56,12 @@ def get_lecturers():
     ).all()
 
 
-    data = []
+    result = []
 
 
     for lecturer in lecturers:
 
-        data.append({
+        result.append({
 
             "id": lecturer.id,
 
@@ -77,4 +73,4 @@ def get_lecturers():
     db.close()
 
 
-    return data
+    return result
