@@ -56,6 +56,16 @@ def seed_database():
                 "department": "Computing",
             },
         )
+        _get_or_create(
+            db,
+            Lecturer,
+            {"email": "richard@example.com"},
+            {
+                "full_name": "Dr Richard",
+                "email": "richard@example.com",
+                "department": "Computing",
+            },
+        )
 
         database_systems = _get_or_create(
             db,

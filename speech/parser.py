@@ -274,7 +274,7 @@ def parse_attendance_command(text):
 
 
     print(
-        "Normalized:",
+        "📝 Processing command:",
         text
     )
 
