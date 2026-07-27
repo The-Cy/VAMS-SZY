@@ -22,7 +22,7 @@ class VoiceThread(QThread):
     def run(self):
 
 
-        print("🎤 Voice thread started")
+        print("🎤 Voice input is ready")
 
 
         while self.running:
@@ -32,7 +32,7 @@ class VoiceThread(QThread):
 
 
             print(
-                "Recognized:",
+                "🗣️ Voice command received:",
                 text
             )
 
